@@ -5,13 +5,17 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.util.Patterns
-import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.health.virtualdoctor.R
+import com.health.virtualdoctor.data.api.RetrofitClient
+import com.health.virtualdoctor.data.models.LoginRequest
+import com.health.virtualdoctor.utils.TokenManager
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
@@ -20,15 +24,17 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var tilPassword: TextInputLayout
     private lateinit var etPassword: TextInputEditText
     private lateinit var btnLogin: MaterialButton
-    private lateinit var tvForgotPassword: View
-    private lateinit var tvRegisterLink: View
+    private lateinit var tvRegisterLink: android.view.View
+
+    private lateinit var tokenManager: TokenManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        // Rendre la barre de statut transparente
         window.statusBarColor = resources.getColor(R.color.transparent, theme)
+
+        tokenManager = TokenManager(this)
 
         initViews()
         setupListeners()
@@ -41,7 +47,6 @@ class LoginActivity : AppCompatActivity() {
         tilPassword = findViewById(R.id.tilPassword)
         etPassword = findViewById(R.id.etPassword)
         btnLogin = findViewById(R.id.btnLogin)
-        tvForgotPassword = findViewById(R.id.tvForgotPassword)
         tvRegisterLink = findViewById(R.id.tvRegisterLink)
     }
 
@@ -52,17 +57,12 @@ class LoginActivity : AppCompatActivity() {
             }
         }
 
-        tvForgotPassword.setOnClickListener {
-            Toast.makeText(this, "Fonctionnalité à venir", Toast.LENGTH_SHORT).show()
-        }
-
         tvRegisterLink.setOnClickListener {
             navigateToRegister()
         }
     }
 
     private fun setupValidation() {
-        // Validation en temps réel pour l'email
         etEmail.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -71,7 +71,6 @@ class LoginActivity : AppCompatActivity() {
             }
         })
 
-        // Validation en temps réel pour le mot de passe
         etPassword.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -84,7 +83,6 @@ class LoginActivity : AppCompatActivity() {
     private fun validateInputs(): Boolean {
         var isValid = true
 
-        // Validation email
         val email = etEmail.text.toString().trim()
         if (email.isEmpty()) {
             tilEmail.error = "L'email est requis"
@@ -96,7 +94,6 @@ class LoginActivity : AppCompatActivity() {
             tilEmail.error = null
         }
 
-        // Validation mot de passe
         val password = etPassword.text.toString()
         if (password.isEmpty()) {
             tilPassword.error = "Le mot de passe est requis"
@@ -115,21 +112,65 @@ class LoginActivity : AppCompatActivity() {
         val email = etEmail.text.toString().trim()
         val password = etPassword.text.toString()
 
-        // Désactiver le bouton pendant le traitement
         btnLogin.isEnabled = false
         btnLogin.text = "Connexion..."
 
-        // Simuler une connexion (à remplacer par l'appel API réel)
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            btnLogin.isEnabled = true
-            btnLogin.text = getString(R.string.login_button)
+        lifecycleScope.launch {
+            try {
+                val request = LoginRequest(email, password)
+                // ✅ FIX: Use getApiService() instead of apiService
+                val response = RetrofitClient.getApiService(this@LoginActivity).login(request)
 
-            // Pour le moment, afficher un message de succès
-            Toast.makeText(this, "Connexion réussie!", Toast.LENGTH_SHORT).show()
+                if (response.isSuccessful && response.body() != null) {
+                    val authResponse = response.body()!!
 
-            // TODO: Navigation vers HomeActivity ou DoctorDashboardActivity selon le rôle
-            // navigateToHome()
-        }, 2000)
+                    // Sauvegarder les tokens
+                    tokenManager.saveTokens(authResponse.accessToken, authResponse.refreshToken)
+
+                    // Sauvegarder les infos utilisateur
+                    val role = authResponse.user.roles.firstOrNull() ?: "USER"
+                    tokenManager.saveUserInfo(
+                        authResponse.userId,
+                        authResponse.user.email,
+                        authResponse.user.fullName,
+                        role
+                    )
+
+                    Toast.makeText(this@LoginActivity, "✅ Connexion réussie!", Toast.LENGTH_SHORT).show()
+
+                    // Rediriger selon le rôle
+                    navigateByRole(role)
+
+                } else {
+                    Toast.makeText(this@LoginActivity, "❌ ${response.message()}", Toast.LENGTH_LONG).show()
+                }
+
+            } catch (e: Exception) {
+                Toast.makeText(this@LoginActivity, "❌ Erreur: ${e.message}", Toast.LENGTH_LONG).show()
+                e.printStackTrace()
+            } finally {
+                btnLogin.isEnabled = true
+                btnLogin.text = getString(R.string.login_button)
+            }
+        }
+    }
+
+    private fun navigateByRole(role: String) {
+        when (role) {
+            "USER" -> {
+                // TODO: Navigate to User Home
+                Toast.makeText(this, "🏠 User Home", Toast.LENGTH_SHORT).show()
+            }
+            "DOCTOR" -> {
+                // TODO: Navigate to Doctor Dashboard
+                Toast.makeText(this, "👨‍⚕️ Doctor Dashboard", Toast.LENGTH_SHORT).show()
+            }
+            "ADMIN" -> {
+                // TODO: Navigate to Admin Dashboard
+                Toast.makeText(this, "⚙️ Admin Dashboard", Toast.LENGTH_SHORT).show()
+            }
+        }
+        finish()
     }
 
     private fun navigateToRegister() {
@@ -137,11 +178,4 @@ class LoginActivity : AppCompatActivity() {
         startActivity(intent)
         overridePendingTransition(android.R.anim.slide_in_left, android.R.anim.slide_out_right)
     }
-
-    // À implémenter plus tard
-    // private fun navigateToHome() {
-    //     val intent = Intent(this, HomeActivity::class.java)
-    //     startActivity(intent)
-    //     finish()
-    // }
 }
