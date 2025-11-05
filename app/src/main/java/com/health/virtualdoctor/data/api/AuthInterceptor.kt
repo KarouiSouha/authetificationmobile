@@ -20,11 +20,13 @@ class AuthInterceptor(private val context: Context) : Interceptor {
 
         // Ne pas ajouter de token pour les endpoints d'authentification
         if (originalRequest.url.encodedPath.contains("/auth/login") ||
-            originalRequest.url.encodedPath.contains("/auth/register")) {
+            originalRequest.url.encodedPath.contains("/auth/register") ||
+            originalRequest.url.encodedPath.contains("/doctors/register") ||
+            originalRequest.url.encodedPath.contains("/doctors/login")) {
             return chain.proceed(originalRequest)
         }
 
-        // Ajouter le token d’accès s’il existe
+        // Ajouter le token d'accès s'il existe
         val accessToken = tokenManager.getAccessToken()
         val requestWithToken = if (accessToken != null) {
             originalRequest.newBuilder()
@@ -54,7 +56,7 @@ class AuthInterceptor(private val context: Context) : Interceptor {
                 } else {
                     // Échec du refresh → déconnexion
                     tokenManager.clearTokens()
-                    // TODO: Rediriger vers l’écran de login si nécessaire
+                    // TODO: Rediriger vers l'écran de login si nécessaire
                 }
             }
         }
@@ -77,8 +79,9 @@ class AuthInterceptor(private val context: Context) : Interceptor {
             val mediaType = "application/json; charset=utf-8".toMediaTypeOrNull()
             val requestBody = RequestBody.create(mediaType, jsonBody)
 
+            // ✅ FIX: Utiliser getAuthBaseUrl() au lieu de getBaseUrl()
             val request = Request.Builder()
-                .url("${RetrofitClient.getBaseUrl()}api/v1/auth/refresh")
+                .url("${RetrofitClient.getAuthBaseUrl()}api/v1/auth/refresh")
                 .post(requestBody)
                 .build()
 

@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.util.Patterns
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -118,36 +119,41 @@ class LoginActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val request = LoginRequest(email, password)
-                // ✅ FIX: Use getApiService() instead of apiService
                 val response = RetrofitClient.getApiService(this@LoginActivity).login(request)
 
                 if (response.isSuccessful && response.body() != null) {
                     val authResponse = response.body()!!
 
-                    // Sauvegarder les tokens
+                    Log.d("LoginActivity", "✅ Response: $authResponse")
+
+                    // ✅ Sauvegarder les tokens
                     tokenManager.saveTokens(authResponse.accessToken, authResponse.refreshToken)
 
-                    // Sauvegarder les infos utilisateur
+                    // ✅ FIX: Gérer userId nullable (utiliser email si null)
+                    val userId = authResponse.userId ?: authResponse.user.email
                     val role = authResponse.user.roles.firstOrNull() ?: "USER"
+
                     tokenManager.saveUserInfo(
-                        authResponse.userId,
-                        authResponse.user.email,
-                        authResponse.user.fullName,
-                        role
+                        userId = userId,
+                        email = authResponse.user.email,
+                        name = authResponse.user.fullName,
+                        role = role
                     )
 
                     Toast.makeText(this@LoginActivity, "✅ Connexion réussie!", Toast.LENGTH_SHORT).show()
 
-                    // Rediriger selon le rôle
+                    // ✅ Rediriger selon le rôle
                     navigateByRole(role)
 
                 } else {
-                    Toast.makeText(this@LoginActivity, "❌ ${response.message()}", Toast.LENGTH_LONG).show()
+                    val errorBody = response.errorBody()?.string() ?: response.message()
+                    Log.e("LoginActivity", "❌ Error: $errorBody")
+                    Toast.makeText(this@LoginActivity, "❌ $errorBody", Toast.LENGTH_LONG).show()
                 }
 
             } catch (e: Exception) {
+                Log.e("LoginActivity", "❌ Exception: ${e.message}", e)
                 Toast.makeText(this@LoginActivity, "❌ Erreur: ${e.message}", Toast.LENGTH_LONG).show()
-                e.printStackTrace()
             } finally {
                 btnLogin.isEnabled = true
                 btnLogin.text = getString(R.string.login_button)
@@ -158,15 +164,12 @@ class LoginActivity : AppCompatActivity() {
     private fun navigateByRole(role: String) {
         when (role) {
             "USER" -> {
-                // TODO: Navigate to User Home
                 Toast.makeText(this, "🏠 User Home", Toast.LENGTH_SHORT).show()
             }
             "DOCTOR" -> {
-                // TODO: Navigate to Doctor Dashboard
                 Toast.makeText(this, "👨‍⚕️ Doctor Dashboard", Toast.LENGTH_SHORT).show()
             }
             "ADMIN" -> {
-                // TODO: Navigate to Admin Dashboard
                 Toast.makeText(this, "⚙️ Admin Dashboard", Toast.LENGTH_SHORT).show()
             }
         }

@@ -20,4 +20,10 @@ interface ApiService {
     
     @GET("api/v1/users/profile")
     suspend fun getUserProfile(@Header("Authorization") token: String): Response<UserResponse>
+    // ✅ DOCTOR ACTIVATION SERVICE ENDPOINTS (port 8083)
+    @POST("http://localhost:8083/api/doctors/register")
+    suspend fun registerDoctor(@Body request: DoctorRegisterRequest): Response<DoctorResponse>
+
+    @POST("http://localhost:8083/api/doctors/login")
+    suspend fun loginDoctor(@Body request: Map<String, String>): Response<Map<String, Any>>
 }
