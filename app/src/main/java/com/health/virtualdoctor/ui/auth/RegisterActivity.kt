@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.util.Patterns
 import android.view.View
 import android.widget.CheckBox
@@ -13,10 +14,16 @@ import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.health.virtualdoctor.R
+import com.health.virtualdoctor.ui.data.api.RetrofitClient
+import com.health.virtualdoctor.ui.data.models.DoctorRegisterRequest
+import com.health.virtualdoctor.ui.data.models.RegisterRequest
+import com.health.virtualdoctor.ui.utils.TokenManager
+import kotlinx.coroutines.launch
 
 class RegisterActivity : AppCompatActivity() {
 
@@ -55,24 +62,20 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var etClinicName: TextInputEditText
     private lateinit var tilClinicAddress: TextInputLayout
     private lateinit var etClinicAddress: TextInputEditText
-    private lateinit var tilConsultationFee: TextInputLayout
-    private lateinit var etConsultationFee: TextInputEditText
-    private lateinit var tilLanguages: TextInputLayout
-    private lateinit var etLanguages: TextInputEditText
-    private lateinit var tilBio: TextInputLayout
-    private lateinit var etBio: TextInputEditText
-    private lateinit var cbOnlineConsultations: CheckBox
-    private lateinit var cbInPersonConsultations: CheckBox
 
     private lateinit var cbTerms: CheckBox
     private lateinit var btnRegister: MaterialButton
     private lateinit var tvLoginLink: TextView
+
+    private lateinit var tokenManager: TokenManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
 
         window.statusBarColor = resources.getColor(R.color.transparent, theme)
+
+        tokenManager = TokenManager(this)
 
         initViews()
         setupListeners()
@@ -115,14 +118,6 @@ class RegisterActivity : AppCompatActivity() {
         etClinicName = findViewById(R.id.etClinicName)
         tilClinicAddress = findViewById(R.id.tilClinicAddress)
         etClinicAddress = findViewById(R.id.etClinicAddress)
-        tilConsultationFee = findViewById(R.id.tilConsultationFee)
-        etConsultationFee = findViewById(R.id.etConsultationFee)
-        tilLanguages = findViewById(R.id.tilLanguages)
-        etLanguages = findViewById(R.id.etLanguages)
-        tilBio = findViewById(R.id.tilBio)
-        etBio = findViewById(R.id.etBio)
-        cbOnlineConsultations = findViewById(R.id.cbOnlineConsultations)
-        cbInPersonConsultations = findViewById(R.id.cbInPersonConsultations)
 
         cbTerms = findViewById(R.id.cbTerms)
         btnRegister = findViewById(R.id.btnRegister)
@@ -219,8 +214,8 @@ class RegisterActivity : AppCompatActivity() {
         if (password.isEmpty()) {
             tilPassword.error = "Le mot de passe est requis"
             isValid = false
-        } else if (password.length < 6) {
-            tilPassword.error = "Au moins 6 caractères"
+        } else if (password.length < 8) {
+            tilPassword.error = "Au moins 8 caractères"
             isValid = false
         }
 
@@ -284,43 +279,143 @@ class RegisterActivity : AppCompatActivity() {
         btnRegister.isEnabled = false
         btnRegister.text = "Inscription..."
 
-        // Collect basic data
-        val userData = hashMapOf(
-            "firstName" to etFirstName.text.toString().trim(),
-            "lastName" to etLastName.text.toString().trim(),
-            "email" to etEmail.text.toString().trim(),
-            "phoneNumber" to etPhone.text.toString().trim(),
-            "password" to etPassword.text.toString(),
-            "userType" to if (rbPatient.isChecked) "PATIENT" else "DOCTOR"
+        lifecycleScope.launch {
+            try {
+                if (rbDoctor.isChecked) {
+                    // ✅ DOCTOR: Appeler doctor-activation-service (port 8083)
+                    registerAsDoctor()
+                } else {
+                    // ✅ USER: Appeler auth-service (port 8082)
+                    registerAsUser()
+                }
+            } catch (e: Exception) {
+                Log.e("RegisterActivity", "❌ Exception: ${e.message}", e)
+                Toast.makeText(
+                    this@RegisterActivity,
+                    "❌ Erreur: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                btnRegister.isEnabled = true
+                btnRegister.text = getString(R.string.register_button)
+            }
+        }
+    }
+
+    // ✅ Register Doctor via doctor-activation-service (port 8083)
+    private suspend fun registerAsDoctor() {
+        val request = DoctorRegisterRequest(
+            email = etEmail.text.toString().trim(),
+            password = etPassword.text.toString(),
+            firstName = etFirstName.text.toString().trim(),
+            lastName = etLastName.text.toString().trim(),
+            birthDate = null, // TODO: Add date picker
+            gender = null, // TODO: Add gender selection
+            phoneNumber = etPhone.text.toString().trim(),
+            medicalLicenseNumber = etLicenseNumber.text.toString().trim(),
+            specialization = etSpecialization.text.toString().trim(),
+            hospitalAffiliation = etClinicName.text.toString().trim(),
+            yearsOfExperience = etYearsOfExperience.text.toString().trim().toIntOrNull() ?: 0,
+            officeAddress = etClinicAddress.text.toString().trim().ifEmpty { null },
+            consultationHours = null
         )
 
-        // Add doctor-specific data
-        if (rbDoctor.isChecked) {
-            userData["specialization"] = etSpecialization.text.toString().trim()
-            userData["licenseNumber"] = etLicenseNumber.text.toString().trim()
-            userData["yearsOfExperience"] = etYearsOfExperience.text.toString().trim()
-            userData["education"] = etEducation.text.toString().trim()
-            userData["clinicName"] = etClinicName.text.toString().trim()
-            userData["clinicAddress"] = etClinicAddress.text.toString().trim()
-            userData["consultationFee"] = etConsultationFee.text.toString().trim().ifEmpty { "0.0" }
-            userData["languages"] = etLanguages.text.toString().trim()
-            userData["bio"] = etBio.text.toString().trim()
-            userData["acceptsOnlineConsultations"] = cbOnlineConsultations.isChecked.toString()
-            userData["acceptsInPersonConsultations"] = cbInPersonConsultations.isChecked.toString()
-        }
+        Log.d("RegisterActivity", "🩺 Registering doctor: ${request.email}")
 
-        // Simulate API call
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            btnRegister.isEnabled = true
-            btnRegister.text = getString(R.string.register_button)
+        // ✅ Utiliser getDoctorService() pour appeler port 8083
+        val response = RetrofitClient.getDoctorService(this@RegisterActivity)
+            .registerDoctor(request)
 
-            Toast.makeText(this, "Inscription réussie!", Toast.LENGTH_SHORT).show()
+        if (response.isSuccessful && response.body() != null) {
+            val doctorResponse = response.body()!!
 
-            // Log collected data (for debugging)
-            println("User Data: $userData")
+            Log.d("RegisterActivity", "✅ Doctor registered: ${doctorResponse.email}")
 
+            Toast.makeText(
+                this@RegisterActivity,
+                "✅ Inscription réussie!\n⏳ En attente d'activation par l'admin",
+                Toast.LENGTH_LONG
+            ).show()
+
+            // Rediriger vers login
             navigateToLogin()
-        }, 2000)
+        } else {
+            val errorBody = response.errorBody()?.string() ?: response.message()
+            Log.e("RegisterActivity", "❌ Doctor registration error: $errorBody")
+            Toast.makeText(
+                this@RegisterActivity,
+                "❌ Erreur: $errorBody",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    // ✅ Register User via auth-service (port 8082)
+    private suspend fun registerAsUser() {
+        val request = RegisterRequest(
+            email = etEmail.text.toString().trim(),
+            password = etPassword.text.toString(),
+            firstName = etFirstName.text.toString().trim(),
+            lastName = etLastName.text.toString().trim(),
+            birthDate = null,
+            gender = null,
+            phoneNumber = etPhone.text.toString().trim(),
+            role = "USER"
+        )
+
+        Log.d("RegisterActivity", "👤 Registering user: ${request.email}")
+
+        // ✅ Utiliser getAuthService() pour appeler port 8082
+        val response = RetrofitClient.getAuthService(this@RegisterActivity)
+            .register(request)
+
+        if (response.isSuccessful && response.body() != null) {
+            val authResponse = response.body()!!
+
+            Log.d("RegisterActivity", "✅ User registered: ${authResponse.user.email}")
+
+            // Sauvegarder les tokens
+            tokenManager.saveTokens(authResponse.accessToken, authResponse.refreshToken)
+
+            val userId = authResponse.userId ?: authResponse.user.email
+            tokenManager.saveUserInfo(
+                userId = userId,
+                email = authResponse.user.email,
+                name = authResponse.user.fullName,
+                role = "USER"
+            )
+
+            Toast.makeText(
+                this@RegisterActivity,
+                "✅ Inscription réussie!",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            navigateByRole("USER")
+        } else {
+            val errorBody = response.errorBody()?.string() ?: response.message()
+            Log.e("RegisterActivity", "❌ User registration error: $errorBody")
+            Toast.makeText(
+                this@RegisterActivity,
+                "❌ Erreur: $errorBody",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private fun navigateByRole(role: String) {
+        when (role) {
+            "USER" -> {
+                Toast.makeText(this, "🏠 Bienvenue User!", Toast.LENGTH_SHORT).show()
+            }
+            "DOCTOR" -> {
+                Toast.makeText(this, "👨‍⚕️ Bienvenue Docteur!", Toast.LENGTH_SHORT).show()
+            }
+            "ADMIN" -> {
+                Toast.makeText(this, "⚙️ Bienvenue Admin!", Toast.LENGTH_SHORT).show()
+            }
+        }
+        finish()
     }
 
     private fun navigateToLogin() {

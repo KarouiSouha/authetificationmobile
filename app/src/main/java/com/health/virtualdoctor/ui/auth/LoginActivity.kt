@@ -4,36 +4,42 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.util.Patterns
 import android.view.View
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.health.virtualdoctor.R
+import com.health.virtualdoctor.ui.data.api.RetrofitClient
+import com.health.virtualdoctor.ui.data.models.LoginRequest
 import com.health.virtualdoctor.ui.doctor.DoctorDashboardActivity
+import com.health.virtualdoctor.ui.utils.TokenManager
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 class LoginActivity : AppCompatActivity() {
 
-    private lateinit var rgUserType: RadioGroup
-    private lateinit var rbPatient: RadioButton
-    private lateinit var rbDoctor: RadioButton
     private lateinit var tilEmail: TextInputLayout
     private lateinit var etEmail: TextInputEditText
     private lateinit var tilPassword: TextInputLayout
     private lateinit var etPassword: TextInputEditText
     private lateinit var btnLogin: MaterialButton
-    private lateinit var tvForgotPassword: View
-    private lateinit var tvRegisterLink: View
+    private lateinit var tvRegisterLink: android.view.View
+
+    private lateinit var tokenManager: TokenManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
         window.statusBarColor = resources.getColor(R.color.transparent, theme)
+        tokenManager = TokenManager(this)
 
         initViews()
         setupListeners()
@@ -41,15 +47,11 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        rgUserType = findViewById(R.id.rgUserTypeLogin)
-        rbPatient = findViewById(R.id.rbPatientLogin)
-        rbDoctor = findViewById(R.id.rbDoctorLogin)
         tilEmail = findViewById(R.id.tilEmail)
         etEmail = findViewById(R.id.etEmail)
         tilPassword = findViewById(R.id.tilPassword)
         etPassword = findViewById(R.id.etPassword)
         btnLogin = findViewById(R.id.btnLogin)
-        tvForgotPassword = findViewById(R.id.tvForgotPassword)
         tvRegisterLink = findViewById(R.id.tvRegisterLink)
     }
 
@@ -58,10 +60,6 @@ class LoginActivity : AppCompatActivity() {
             if (validateInputs()) {
                 performLogin()
             }
-        }
-
-        tvForgotPassword.setOnClickListener {
-            Toast.makeText(this, "Fonctionnalité à venir", Toast.LENGTH_SHORT).show()
         }
 
         tvRegisterLink.setOnClickListener {
@@ -116,42 +114,171 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun performLogin() {
-        val email = etEmail.text.toString().trim()
+        val email = etEmail.text.toString().trim().lowercase()
         val password = etPassword.text.toString()
-        val isDoctor = rbDoctor.isChecked
 
         btnLogin.isEnabled = false
         btnLogin.text = "Connexion..."
 
-        // Simuler une connexion API
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            btnLogin.isEnabled = true
-            btnLogin.text = getString(R.string.login_button)
+        lifecycleScope.launch {
+            try {
+                val request = LoginRequest(email, password)
 
-            Toast.makeText(this, "Connexion réussie!", Toast.LENGTH_SHORT).show()
+                // ✅ Détecter le type d'utilisateur selon l'email
+                val isDoctor = email.contains("@doctor.")
 
-            // Navigation selon le type d'utilisateur
-            if (isDoctor) {
-                navigateToDoctorDashboard()
-            } else {
-                navigateToPatientHome()
+                Log.d("LoginActivity", "🔍 Email: $email | isDoctor: $isDoctor")
+
+                val response = if (isDoctor) {
+                    // ✅ Doctor Login (port 8083)
+                    Log.d("LoginActivity", "🩺 Calling Doctor Login API")
+                    RetrofitClient.getDoctorService(this@LoginActivity).loginDoctor(request)
+                } else {
+                    // ✅ User Login (port 8082)
+                    Log.d("LoginActivity", "👤 Calling User Login API")
+                    RetrofitClient.getAuthService(this@LoginActivity).login(request)
+                }
+
+                Log.d("LoginActivity", "📡 Response Code: ${response.code()}")
+                Log.d("LoginActivity", "📡 Response Body: ${response.body()}")
+
+                if (response.isSuccessful) {
+                    if (isDoctor) {
+                        handleDoctorLogin(response.body() as Map<String, Any>)
+                    } else {
+                        handleUserLogin(response.body() as? com.health.virtualdoctor.ui.data.models.AuthResponse)
+                    }
+                } else {
+                    val errorBody = response.errorBody()?.string() ?: "Erreur inconnue"
+
+                    // ✅ Parser l'erreur JSON si disponible
+                    try {
+                        val errorJson = JSONObject(errorBody)
+                        val errorMessage = when {
+                            errorJson.has("message") -> errorJson.getString("message")
+                            errorJson.has("error") -> errorJson.getString("error")
+                            else -> "Erreur ${response.code()}"
+                        }
+
+                        Log.e("LoginActivity", "❌ Error: $errorMessage")
+
+                        runOnUiThread {
+                            when {
+                                errorMessage.contains("pending", ignoreCase = true) -> {
+                                    Toast.makeText(
+                                        this@LoginActivity,
+                                        "⏳ Votre compte est en attente d'activation par l'admin",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                errorMessage.contains("not activated", ignoreCase = true) -> {
+                                    Toast.makeText(
+                                        this@LoginActivity,
+                                        "⏳ Compte en attente d'activation",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                                else -> {
+                                    Toast.makeText(
+                                        this@LoginActivity,
+                                        "❌ $errorMessage",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e("LoginActivity", "❌ Raw Error: $errorBody")
+                        Toast.makeText(
+                            this@LoginActivity,
+                            "❌ Erreur ${response.code()}: Vérifiez vos identifiants",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e("LoginActivity", "❌ Exception: ${e.message}", e)
+                Toast.makeText(
+                    this@LoginActivity,
+                    "❌ Erreur de connexion: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                runOnUiThread {
+                    btnLogin.isEnabled = true
+                    btnLogin.text = getString(R.string.login_button)
+                }
             }
-        }, 1500)
+        }
     }
 
-    private fun navigateToDoctorDashboard() {
-        val intent = Intent(this, DoctorDashboardActivity::class.java)
-        startActivity(intent)
+    // ✅ Gérer la réponse USER
+    private fun handleUserLogin(authResponse: com.health.virtualdoctor.ui.data.models.AuthResponse?) {
+        if (authResponse == null) {
+            Toast.makeText(this, "❌ Erreur de parsing", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Log.d("LoginActivity", "✅ User Login Success: ${authResponse.user.email}")
+
+        tokenManager.saveTokens(authResponse.accessToken, authResponse.refreshToken)
+
+        val userId = authResponse.userId ?: authResponse.user.email
+        val role = authResponse.user.roles.firstOrNull() ?: "USER"
+
+        tokenManager.saveUserInfo(
+            userId = userId,
+            email = authResponse.user.email,
+            name = authResponse.user.fullName,
+            role = role
+        )
+
+        Toast.makeText(this, "✅ Connexion réussie!", Toast.LENGTH_SHORT).show()
+        navigateByRole(role)
+    }
+
+    // ✅ Gérer la réponse DOCTOR
+    private fun handleDoctorLogin(response: Map<String, Any>) {
+        Log.d("LoginActivity", "✅ Doctor Login Success")
+
+        // ✅ Extraire les données de la Map
+        val accessToken = response["accessToken"] as? String ?: ""
+        val refreshToken = response["refreshToken"] as? String ?: ""
+        val userId = response["userId"] as? String ?: ""
+        val email = response["email"] as? String ?: ""
+        val fullName = response["fullName"] as? String ?: ""
+
+        if (accessToken.isEmpty() || email.isEmpty()) {
+            Toast.makeText(this, "❌ Données manquantes", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        tokenManager.saveTokens(accessToken, refreshToken)
+        tokenManager.saveUserInfo(
+            userId = userId.ifEmpty { email },
+            email = email,
+            name = fullName,
+            role = "DOCTOR"
+        )
+
+        Toast.makeText(this, "✅ Bienvenue Dr. $fullName!", Toast.LENGTH_SHORT).show()
+        navigateByRole("DOCTOR")
+    }
+
+    private fun navigateByRole(role: String) {
+        when (role) {
+            "USER" -> {
+                Toast.makeText(this, "🏠 User Home", Toast.LENGTH_SHORT).show()
+            }
+            "DOCTOR" -> {
+                Toast.makeText(this, "👨‍⚕️ Doctor Dashboard", Toast.LENGTH_SHORT).show()
+            }
+            "ADMIN" -> {
+                Toast.makeText(this, "⚙️ Admin Dashboard", Toast.LENGTH_SHORT).show()
+            }
+        }
         finish()
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-    }
-
-    private fun navigateToPatientHome() {
-        // TODO: Créer PatientHomeActivity
-        Toast.makeText(this, "Navigation vers Patient Home", Toast.LENGTH_SHORT).show()
-        // val intent = Intent(this, PatientHomeActivity::class.java)
-        // startActivity(intent)
-        // finish()
     }
 
     private fun navigateToRegister() {
