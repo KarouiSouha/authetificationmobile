@@ -10,8 +10,8 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
 
     // ✅ URLs des deux services
-    private const val AUTH_BASE_URL = "https://macie-unprognosticative-kylan.ngrok-free.dev/" // Port 8082
-    private const val DOCTOR_BASE_URL = "https://macie-unprognosticative-kylan.ngrok-free.dev" // Port 8083
+    private const val AUTH_BASE_URL = "https://borders-than-choir-cas.trycloudflare.com" // Port 8082
+    private const val DOCTOR_BASE_URL = "https://direction-commercial-almost-underground.trycloudflare.com" // Port 8083
 
     private var authRetrofit: Retrofit? = null
     private var doctorRetrofit: Retrofit? = null

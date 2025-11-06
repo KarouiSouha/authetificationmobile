@@ -4,5 +4,18 @@
         <domain includeSubdomains="true">192.168.1.16</domain> <!-- IP de mon téléphone-->
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">192.168.1.12</domain> <!-- Ip de mon pc-->
+        <!-- ✅ Vos domaines ngrok -->
+        <domain includeSubdomains="true">ngrok-free.dev</domain>
+        <domain includeSubdomains="true">ngrok.io</domain>
+
     </domain-config>
+    <!-- ✅ Pour la production : forcer HTTPS -->
+    <!-- Décommentez cette section en production -->
+
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
 </network-security-config>
