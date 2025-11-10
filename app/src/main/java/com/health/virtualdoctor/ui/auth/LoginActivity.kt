@@ -7,18 +7,22 @@ import android.text.TextWatcher
 import android.util.Log
 import android.util.Patterns
 import android.view.View
+import android.widget.EditText
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.health.virtualdoctor.R
 import com.health.virtualdoctor.ui.data.api.RetrofitClient
 import com.health.virtualdoctor.ui.data.models.LoginRequest
 import com.health.virtualdoctor.ui.doctor.DoctorDashboardActivity
+import com.health.virtualdoctor.ui.user.UserMetricsActivity
+import com.health.virtualdoctor.ui.utils.FCMHelper
 import com.health.virtualdoctor.ui.utils.TokenManager
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -31,6 +35,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var etPassword: TextInputEditText
     private lateinit var btnLogin: MaterialButton
     private lateinit var tvRegisterLink: android.view.View
+    private lateinit var tvForgotPassword: android.view.View // ✅ NOUVEAU
 
     private lateinit var tokenManager: TokenManager
 
@@ -53,6 +58,7 @@ class LoginActivity : AppCompatActivity() {
         etPassword = findViewById(R.id.etPassword)
         btnLogin = findViewById(R.id.btnLogin)
         tvRegisterLink = findViewById(R.id.tvRegisterLink)
+        tvForgotPassword = findViewById(R.id.tvForgotPassword) // ✅ NOUVEAU
     }
 
     private fun setupListeners() {
@@ -64,6 +70,11 @@ class LoginActivity : AppCompatActivity() {
 
         tvRegisterLink.setOnClickListener {
             navigateToRegister()
+        }
+
+        // ✅ NOUVEAU: Forgot Password
+        tvForgotPassword.setOnClickListener {
+            showForgotPasswordDialog()
         }
     }
 
@@ -124,23 +135,19 @@ class LoginActivity : AppCompatActivity() {
             try {
                 val request = LoginRequest(email, password)
 
-                // ✅ Détecter le type d'utilisateur selon l'email
                 val isDoctor = email.contains("@doctor.")
 
                 Log.d("LoginActivity", "🔍 Email: $email | isDoctor: $isDoctor")
 
                 val response = if (isDoctor) {
-                    // ✅ Doctor Login (port 8083)
                     Log.d("LoginActivity", "🩺 Calling Doctor Login API")
                     RetrofitClient.getDoctorService(this@LoginActivity).loginDoctor(request)
                 } else {
-                    // ✅ User Login (port 8082)
                     Log.d("LoginActivity", "👤 Calling User Login API")
                     RetrofitClient.getAuthService(this@LoginActivity).login(request)
                 }
 
                 Log.d("LoginActivity", "📡 Response Code: ${response.code()}")
-                Log.d("LoginActivity", "📡 Response Body: ${response.body()}")
 
                 if (response.isSuccessful) {
                     if (isDoctor) {
@@ -151,7 +158,6 @@ class LoginActivity : AppCompatActivity() {
                 } else {
                     val errorBody = response.errorBody()?.string() ?: "Erreur inconnue"
 
-                    // ✅ Parser l'erreur JSON si disponible
                     try {
                         val errorJson = JSONObject(errorBody)
                         val errorMessage = when {
@@ -213,7 +219,6 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ Gérer la réponse USER
     private fun handleUserLogin(authResponse: com.health.virtualdoctor.ui.data.models.AuthResponse?) {
         if (authResponse == null) {
             Toast.makeText(this, "❌ Erreur de parsing", Toast.LENGTH_SHORT).show()
@@ -234,15 +239,15 @@ class LoginActivity : AppCompatActivity() {
             role = role
         )
 
+        FCMHelper.saveFCMToken(this)
+
         Toast.makeText(this, "✅ Connexion réussie!", Toast.LENGTH_SHORT).show()
         navigateByRole(role)
     }
 
-    // ✅ Gérer la réponse DOCTOR
     private fun handleDoctorLogin(response: Map<String, Any>) {
         Log.d("LoginActivity", "✅ Doctor Login Success")
 
-        // ✅ Extraire les données de la Map
         val accessToken = response["accessToken"] as? String ?: ""
         val refreshToken = response["refreshToken"] as? String ?: ""
         val userId = response["userId"] as? String ?: ""
@@ -262,23 +267,115 @@ class LoginActivity : AppCompatActivity() {
             role = "DOCTOR"
         )
 
+        FCMHelper.saveFCMToken(this)
+
         Toast.makeText(this, "✅ Bienvenue Dr. $fullName!", Toast.LENGTH_SHORT).show()
         navigateByRole("DOCTOR")
     }
 
     private fun navigateByRole(role: String) {
-        when (role) {
-            "USER" -> {
-                Toast.makeText(this, "🏠 User Home", Toast.LENGTH_SHORT).show()
-            }
-            "DOCTOR" -> {
-                Toast.makeText(this, "👨‍⚕️ Doctor Dashboard", Toast.LENGTH_SHORT).show()
-            }
+        val intent = when (role) {
+            "USER" -> Intent(this, UserMetricsActivity::class.java)
+            "DOCTOR" -> Intent(this, DoctorDashboardActivity::class.java)
             "ADMIN" -> {
-                Toast.makeText(this, "⚙️ Admin Dashboard", Toast.LENGTH_SHORT).show()
+                Intent(this, UserMetricsActivity::class.java).apply {
+                    putExtra("message", "⚙️ Admin Dashboard (à implémenter)")
+                }
+            }
+            else -> Intent(this, com.health.virtualdoctor.ui.welcome.WelcomeActivity::class.java)
+        }
+
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+
+        startActivity(intent)
+        finish()
+
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+    }
+
+    // ✅ NOUVEAU: Dialog "Mot de passe oublié"
+    private fun showForgotPasswordDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_forgot_password, null)
+        val etEmailForgot = dialogView.findViewById<EditText>(R.id.etEmailForgot)
+        val rgUserTypeForgot = dialogView.findViewById<RadioGroup>(R.id.rgUserTypeForgot)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Mot de passe oublié")
+            .setMessage("Entrez votre email pour réinitialiser votre mot de passe")
+            .setView(dialogView)
+            .setPositiveButton("Envoyer") { _, _ ->
+                val email = etEmailForgot.text.toString().trim()
+
+                if (email.isEmpty()) {
+                    Toast.makeText(this, "⚠️ L'email est requis", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                    Toast.makeText(this, "⚠️ Email invalide", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                // ✅ Détecter le type selon le RadioButton sélectionné
+                val selectedId = rgUserTypeForgot.checkedRadioButtonId
+                val isDoctor = (selectedId == R.id.rbDoctorForgot)
+
+                Log.d("LoginActivity", "🔐 Forgot password for: $email (isDoctor: $isDoctor)")
+
+                performForgotPassword(email, isDoctor)
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    // ✅ NOUVEAU: Envoyer demande de réinitialisation
+    private fun performForgotPassword(email: String, isDoctor: Boolean) {
+        lifecycleScope.launch {
+            try {
+                val request = mapOf("email" to email)
+
+                Log.d("LoginActivity", "📤 Sending forgot password request...")
+                Log.d("LoginActivity", "   Email: $email")
+                Log.d("LoginActivity", "   Type: ${if (isDoctor) "DOCTOR" else "USER"}")
+
+                val response = if (isDoctor) {
+                    // Call DOCTOR SERVICE (port 8083)
+                    RetrofitClient.getDoctorService(this@LoginActivity)
+                        .forgotDoctorPassword(request)
+                } else {
+                    // Call USER SERVICE (port 8085)
+                    RetrofitClient.getUserService(this@LoginActivity)
+                        .forgotUserPassword(request)
+                }
+
+                if (response.isSuccessful) {
+                    Log.d("LoginActivity", "✅ Forgot password email sent")
+
+                    Toast.makeText(
+                        this@LoginActivity,
+                        "✅ Un email de réinitialisation a été envoyé à $email",
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    val errorBody = response.errorBody()?.string()
+                    Log.e("LoginActivity", "❌ Forgot password error: $errorBody")
+
+                    Toast.makeText(
+                        this@LoginActivity,
+                        "❌ Erreur ${response.code()}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+
+            } catch (e: Exception) {
+                Log.e("LoginActivity", "❌ Exception: ${e.message}", e)
+                Toast.makeText(
+                    this@LoginActivity,
+                    "❌ Erreur: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         }
-        finish()
     }
 
     private fun navigateToRegister() {

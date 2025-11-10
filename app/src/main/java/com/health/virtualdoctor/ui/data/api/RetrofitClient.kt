@@ -1,6 +1,5 @@
 package com.health.virtualdoctor.ui.data.api
 
-
 import android.content.Context
 import com.health.virtualdoctor.ui.data.models.ApiService
 import okhttp3.OkHttpClient
@@ -11,26 +10,31 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
 
-    // ✅ URLs des deux services
-    private const val AUTH_BASE_URL = "https://stores-faq-looks-burner.trycloudflare.com" // Port 8082
-    private const val DOCTOR_BASE_URL = "https://viking-game-dale-player.trycloudflare.com" // Port 8083
+    // ✅ URLs des services via Cloudflare Tunnels
+    private const val AUTH_BASE_URL = "https://defining-projection-email-mathematics.trycloudflare.com" // Port 8082
+    private const val DOCTOR_BASE_URL = "https://broken-shares-resident-contacts.trycloudflare.com" // Port 8083
+    private const val NOTIFICATION_BASE_URL = "https://markers-brilliant-nobody-appliance.trycloudflare.com" // Port 8084
+    private const val USER_BASE_URL = "https://lol-crest-univ-microwave.trycloudflare.com" // Port 8085
 
     private var authRetrofit: Retrofit? = null
     private var doctorRetrofit: Retrofit? = null
+    private var notificationRetrofit: Retrofit? = null
+    private var userRetrofit: Retrofit? = null
 
     private var authApiService: ApiService? = null
     private var doctorApiService: ApiService? = null
+    private var notificationApiService: ApiService? = null
+    private var userApiService: ApiService? = null
 
     private var appContext: Context? = null
 
-    // ✅ Fonction init() pour la compatibilité avec HealthApp
+    // ✅ Init function for compatibility
     fun init(context: Context) {
         appContext = context.applicationContext
-        // Pre-initialize services if needed
         getAuthService(appContext!!)
     }
 
-    // ✅ Service pour Auth (port 8082)
+    // ✅ AUTH Service (port 8082)
     fun getAuthService(context: Context): ApiService {
         if (authApiService == null) {
             authRetrofit = createRetrofit(AUTH_BASE_URL, context)
@@ -39,7 +43,7 @@ object RetrofitClient {
         return authApiService!!
     }
 
-    // ✅ Service pour Doctor (port 8083)
+    // ✅ DOCTOR Service (port 8083)
     fun getDoctorService(context: Context): ApiService {
         if (doctorApiService == null) {
             doctorRetrofit = createRetrofit(DOCTOR_BASE_URL, context)
@@ -48,8 +52,26 @@ object RetrofitClient {
         return doctorApiService!!
     }
 
-    // ✅ Service par défaut (pour compatibilité avec ancien code)
-    @Deprecated("Use getAuthService() or getDoctorService() instead")
+    // ✅ NOTIFICATION Service (port 8084) - 🆕 VIA CLOUDFLARE
+    fun getNotificationService(context: Context): ApiService {
+        if (notificationApiService == null) {
+            notificationRetrofit = createRetrofit(NOTIFICATION_BASE_URL, context)
+            notificationApiService = notificationRetrofit!!.create(ApiService::class.java)
+        }
+        return notificationApiService!!
+    }
+
+    // ✅ USER Service (port 8085)
+    fun getUserService(context: Context): ApiService {
+        if (userApiService == null) {
+            userRetrofit = createRetrofit(USER_BASE_URL, context)
+            userApiService = userRetrofit!!.create(ApiService::class.java)
+        }
+        return userApiService!!
+    }
+
+    // ✅ Default service (for backward compatibility)
+    @Deprecated("Use getAuthService(), getDoctorService(), getUserService(), or getNotificationService() instead")
     fun getApiService(context: Context): ApiService {
         return getAuthService(context)
     }
@@ -76,7 +98,9 @@ object RetrofitClient {
             .build()
     }
 
+    // ✅ Getters pour les URLs (utiles pour debug)
     fun getAuthBaseUrl(): String = AUTH_BASE_URL
     fun getDoctorBaseUrl(): String = DOCTOR_BASE_URL
-
+    fun getNotificationBaseUrl(): String = NOTIFICATION_BASE_URL
+    fun getUserBaseUrl(): String = USER_BASE_URL
 }

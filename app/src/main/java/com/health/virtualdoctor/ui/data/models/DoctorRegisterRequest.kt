@@ -3,6 +3,8 @@ package com.health.virtualdoctor.ui.data.models
 
 data class DoctorRegisterRequest(
     val email: String,
+    val contactEmail: String,       // ✅ NOUVEAU: Email réel pour notifications
+
     val password: String,
     val firstName: String,
     val lastName: String,
@@ -16,5 +18,8 @@ data class DoctorRegisterRequest(
     val hospitalAffiliation: String,
     val yearsOfExperience: Int,
     val officeAddress: String?,
-    val consultationHours: String?
+    val consultationHours: String?,
+
+
+
 )
