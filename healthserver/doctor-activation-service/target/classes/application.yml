@@ -1,0 +1,236 @@
+# # Configuration du Doctor Activation Service
+
+# spring:
+#   application:
+#     name: doctor-activation-service
+  
+#   data:
+#     mongodb:
+#       uri: mongodb://localhost:27017/health_doctor_db
+  
+#   cloud:
+#     config:
+#       enabled: false
+  
+#   main:
+#     allow-bean-definition-overriding: true
+  
+#   # ✅ CORRECTION: Configuration Web/MVC pour éviter que /api/** soit traité comme ressource statique
+#   web:
+#     resources:
+#       add-mappings: true
+#       static-locations: classpath:/static/,classpath:/public/
+  
+#   mvc:
+#     static-path-pattern: /static/**
+#     throw-exception-if-no-handler-found: true
+#     pathmatch:
+#       matching-strategy: ant_path_matcher
+
+# # Configuration des notifications
+# notification:
+#   admin-email: healthapp.healthyfittn@gmail.com
+#   service:
+#     url: http://localhost:8084
+
+# # Configuration du serveur
+# server:
+#   port: 8083
+
+# # Eureka Client Configuration
+# eureka:
+#   client:
+#     service-url:
+#       defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka/}
+#     register-with-eureka: true
+#     fetch-registry: true
+#   instance:
+#     prefer-ip-address: true
+#     instance-id: ${spring.application.name}:${random.value}
+
+# # Feign Client Configuration
+# feign:
+#   client:
+#     config:
+#       default:
+#         connectTimeout: 5000
+#         readTimeout: 5000
+#         loggerLevel: full  
+#   circuitbreaker:
+#     enabled: true
+
+# # Resilience4j Circuit Breaker Configuration
+# resilience4j:
+#   circuitbreaker:
+#     instances:
+#       auth-service:
+#         register-health-indicator: true
+#         sliding-window-size: 10
+#         minimum-number-of-calls: 5
+#         wait-duration-in-open-state: 10s
+#         failure-rate-threshold: 50
+#       notification-service:
+#         register-health-indicator: true
+#         sliding-window-size: 10
+#         minimum-number-of-calls: 5
+#         wait-duration-in-open-state: 10s
+#         failure-rate-threshold: 50
+
+# # JWT Configuration
+# app:
+#   jwt:
+#     secret: 21f4e176cd2f4b991bd27fd94a7acfa923a032015252f7f725cee7761503b6120d0f92dcda38390c619190e921833477ea8f32100e9d59bcd398073b1552c15e
+#     expiration: 900000  # 15 minutes
+#     refresh-token:
+#       expiration: 604800000  # 7 jours
+
+# # Actuator Configuration
+# management:
+#   endpoints:
+#     web:
+#       exposure:
+#         include: health,info,metrics,circuitbreakers
+#   endpoint:
+#     health:
+#       show-details: always
+
+# # Logging Configuration
+# logging:
+#   level:
+#     com.healthapp.doctor: DEBUG
+#     org.springframework.cloud.openfeign: DEBUG
+#     org.springframework.web.servlet.mvc: DEBUG
+#     org.springframework.web.servlet.handler: DEBUG
+#   pattern:
+#     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+# # WebRTC avec Metered.ca (GRATUIT)
+# webrtc:
+#   ice-servers:
+#     - urls: "stun:stun.relay.metered.ca:80"
+#     - urls: "turn:global.relay.metered.ca:80"
+#       username: "2c8b81b87d364eed726c1673"
+#       credential: "W+nSmJaAGyMP984j"
+#     - urls: "turn:global.relay.metered.ca:80?transport=tcp"
+#       username: "2c8b81b87d364eed726c1673"
+#       credential: "W+nSmJaAGyMP984j"
+#     - urls: "turn:global.relay.metered.ca:443"
+#       username: "2c8b81b87d364eed726c1673"
+#       credential: "W+nSmJaAGyMP984j"
+#     - urls: "turn:global.relay.metered.ca:443?transport=tcp"
+#       username: "2c8b81b87d364eed726c1673"
+#       credential: "W+nSmJaAGyMP984j"
+
+
+# Configuration du Doctor Activation Service
+
+spring:
+  application:
+    name: doctor-activation-service
+  
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/health_doctor_db
+  
+  cloud:
+    config:
+      enabled: false
+  
+  main:
+    allow-bean-definition-overriding: true
+  
+  web:
+    resources:
+      add-mappings: true
+      static-locations: classpath:/static/,classpath:/public/
+  
+  mvc:
+    static-path-pattern: /static/**
+    throw-exception-if-no-handler-found: true
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+# Configuration des notifications
+notification:
+  admin-email: healthapp.healthyfittn@gmail.com
+  service:
+    url: http://localhost:8084
+
+# Configuration du serveur
+server:
+  port: 8083
+
+# Eureka Client Configuration
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_SERVER:http://localhost:8761/eureka/}
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+
+# Feign Client Configuration
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+        loggerLevel: full  
+  circuitbreaker:
+    enabled: true
+
+# Resilience4j Circuit Breaker Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      auth-service:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+      notification-service:
+        register-health-indicator: true
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        wait-duration-in-open-state: 10s
+        failure-rate-threshold: 50
+
+# JWT Configuration
+app:
+  jwt:
+    secret: 21f4e176cd2f4b991bd27fd94a7acfa923a032015252f7f725cee7761503b6120d0f92dcda38390c619190e921833477ea8f32100e9d59bcd398073b1552c15e
+    expiration: 900000  # 15 minutes
+    refresh-token:
+      expiration: 604800000  # 7 jours
+
+# Actuator Configuration
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+
+# Logging Configuration
+logging:
+  level:
+    com.healthapp.doctor: DEBUG
+    org.springframework.cloud.openfeign: DEBUG
+    org.springframework.web.servlet.mvc: DEBUG
+    org.springframework.web.servlet.handler: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# ============================================================
+# WebRTC Configuration avec Metered.ca (TURN temporaire)
+# ============================================================
+webrtc:
+  metered:
+    domain: web_rtc.metered.live
+    secret-key: 4a562d19fd3a2762f0135ec749763bde501d
+    credential-ttl: 86400  # 24 heures (en secondes)

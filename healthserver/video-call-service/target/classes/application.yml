@@ -1,0 +1,59 @@
+# Video Call Service Configuration
+
+spring:
+  application:
+    name: video-call-service
+  
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/health_videocall_db
+  
+  cloud:
+    config:
+      enabled: false
+
+server:
+  port: 8087
+
+# Cloudflare TURN/STUN Configuration
+cloudflare:
+  turn:
+    url: turns:turn.cloudflare.com:5349?transport=tcp
+    username: ${CLOUDFLARE_TURN_USERNAME:your_username}
+    credential: ${CLOUDFLARE_TURN_CREDENTIAL:your_credential}
+  
+  # Optional: SFU configuration
+  sfu:
+    enabled: false
+    url: ${CLOUDFLARE_SFU_URL:}
+
+# Eureka Client
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+
+# JWT Configuration
+app:
+  jwt:
+    secret: 21f4e176cd2f4b991bd27fd94a7acfa923a032015252f7f725cee7761503b6120d0f92dcda38390c619190e921833477ea8f32100e9d59bcd398073b1552c15e
+    expiration: 900000
+
+# Logging
+logging:
+  level:
+    com.healthapp.videocall: DEBUG
+    org.springframework.messaging: DEBUG
+    org.springframework.web.socket: DEBUG
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
