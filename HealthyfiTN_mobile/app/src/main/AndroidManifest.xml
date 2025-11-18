@@ -9,7 +9,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
-
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <!-- ========================================
          ✅ PERMISSIONS WEBRTC (CRITIQUES)
          ======================================== -->
@@ -19,6 +22,15 @@
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+
+    <!-- Permissions manquantes -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Pour Android 10+ -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
     <!-- ========================================
          🔥 PERMISSIONS FOREGROUND SERVICE (CRITIQUES)
@@ -210,30 +222,7 @@
             android:theme="@style/Theme.VirtualDoctor"
             android:configChanges="orientation|screenSize|keyboardHidden" />
 
-        <!-- ========================================
-             ✅ EMERGENCY VIDEO CALL ACTIVITIES (WEBRTC)
-             ======================================== -->
-        <activity
-            android:name=".ui.emergency.EmergencyCallActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.VirtualDoctor"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:hardwareAccelerated="true"
-            android:launchMode="singleTop"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true" />
 
-        <activity
-            android:name=".ui.emergency.DoctorEmergencyCallActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.VirtualDoctor"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:hardwareAccelerated="true"
-            android:launchMode="singleTop"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true" />
 
         <!-- ========================================
              ✅ OTHER ACTIVITIES
@@ -257,16 +246,8 @@
             </intent-filter>
         </activity-alias>
 
-        <!-- ========================================
-             🔥 EMERGENCY CALL SERVICE (CRITICAL)
-             ======================================== -->
-        <service
-            android:name=".ui.emergency.EmergencyCallService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="camera|microphone|mediaProjection"
-            android:description="@string/emergency_service_description"
-            android:stopWithTask="false" />
+
+
 
         <!-- ========================================
              ✅ FIREBASE CLOUD MESSAGING

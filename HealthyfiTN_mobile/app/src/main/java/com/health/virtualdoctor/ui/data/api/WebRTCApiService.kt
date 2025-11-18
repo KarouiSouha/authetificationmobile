@@ -1,9 +1,7 @@
+package com.health.virtualdoctor.ui.data.api
+
 import retrofit2.Response
-import retrofit2.http.Body
-import retrofit2.http.GET
-import retrofit2.http.Header
-import retrofit2.http.POST
-import retrofit2.http.Path
+import retrofit2.http.*
 
 interface WebRTCApiService {
 
@@ -13,53 +11,48 @@ interface WebRTCApiService {
         @Body request: Map<String, String>
     ): Response<CallSessionResponse>
 
-    @POST("api/webrtc/{callId}/offer")
+    @POST("api/webrtc/calls/{callId}/offer")
     suspend fun sendOffer(
         @Header("Authorization") token: String,
         @Path("callId") callId: String,
         @Body sdp: Map<String, String>
-    ): Response<Map<String, String>>
+    ): Response<Void>
 
-    @GET("api/webrtc/{callId}")
+    @POST("api/webrtc/calls/{callId}/answer")
+    suspend fun sendAnswer(
+        @Header("Authorization") token: String,
+        @Path("callId") callId: String,
+        @Body sdp: Map<String, String>
+    ): Response<Void>
+
+    @POST("api/webrtc/calls/{callId}/ice-candidate")
+    suspend fun sendIceCandidate(
+        @Header("Authorization") token: String,
+        @Path("callId") callId: String,
+        @Body candidate: Map<String, Any>
+    ): Response<Void>
+
+    @GET("api/webrtc/calls/{callId}")
     suspend fun getCallSession(
         @Header("Authorization") token: String,
         @Path("callId") callId: String
     ): Response<CallSessionResponse>
 
-    @POST("api/webrtc/{callId}/answer")
-    suspend fun sendAnswer(
-        @Header("Authorization") token: String,
-        @Path("callId") callId: String,
-        @Body sdp: Map<String, String>
-    ): Response<Map<String, String>>
-
-    @POST("api/webrtc/{callId}/ice")
-    suspend fun sendIceCandidate(
-        @Header("Authorization") token: String,
-        @Path("callId") callId: String,
-        @Body candidate: Map<String, Any?>
-    ): Response<Map<String, String>>
-
-    @POST("api/webrtc/{callId}/end")
+    @POST("api/webrtc/calls/{callId}/end")
     suspend fun endCall(
         @Header("Authorization") token: String,
         @Path("callId") callId: String,
         @Body reason: Map<String, String>
-    ): Response<Map<String, String>>
+    ): Response<Void>
 }
 
+// Data classes
 data class CallSessionResponse(
     val callId: String,
     val appointmentId: String,
-    val doctorId: String,
-    val doctorEmail: String,
-    val patientId: String,
-    val patientEmail: String,
     val callType: String,
     val status: String,
-    val initiatorRole: String,
     val iceServers: String?,
     val offerSdp: String?,
-    val answerSdp: String?,
-    val createdAt: String
+    val answerSdp: String?
 )

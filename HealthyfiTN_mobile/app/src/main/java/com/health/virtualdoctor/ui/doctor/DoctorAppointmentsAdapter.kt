@@ -64,6 +64,9 @@ class DoctorAppointmentsAdapter(
         // Reason
         holder.tvAppointmentReason.text = appointment.reason
 
+        // ✅ FIX: Check if appointment type is VIDEO_CALL and show video button
+        val isVideoCall = appointment.appointmentType.equals("VIDEO_CALL", ignoreCase = true)
+
         // Status chip and button visibility
         when (appointment.status) {
             "SCHEDULED" -> {
@@ -72,17 +75,26 @@ class DoctorAppointmentsAdapter(
                 holder.chipStatus.setChipBackgroundColorResource(android.R.color.holo_orange_light)
                 holder.chipStatus.setTextColor(Color.WHITE)
 
-                // Show all action buttons
+                // Show action buttons
                 holder.llActionButtons.visibility = View.VISIBLE
                 holder.btnStartConsultation.visibility = View.GONE
 
-                // Set button listeners
-                holder.btnViewDetails.setOnClickListener {
-                    onActionClick(appointment, "view_details")
+                // ✅ FIX: Add VIDEO CALL button if appointment type is VIDEO_CALL
+                if (isVideoCall) {
+                    // Add video call button
+                    holder.btnComplete.text = "📹 Appel Vidéo"
+                    holder.btnComplete.setOnClickListener {
+                        onActionClick(appointment, "video_call")
+                    }
+                } else {
+                    holder.btnComplete.text = "✅ Compléter"
+                    holder.btnComplete.setOnClickListener {
+                        onActionClick(appointment, "complete")
+                    }
                 }
 
-                holder.btnComplete.setOnClickListener {
-                    onActionClick(appointment, "complete")
+                holder.btnViewDetails.setOnClickListener {
+                    onActionClick(appointment, "view_details")
                 }
 
                 holder.btnCancelAppt.setOnClickListener {

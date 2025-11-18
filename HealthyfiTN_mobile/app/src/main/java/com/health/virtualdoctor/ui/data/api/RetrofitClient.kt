@@ -1,7 +1,7 @@
 package com.health.virtualdoctor.ui.data.api
 
-import WebRTCApiService
 import android.content.Context
+import com.health.virtualdoctor.ui.data.api.WebRTCApiService
 import com.health.virtualdoctor.ui.data.models.ApiService
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -15,17 +15,17 @@ object RetrofitClient {
 
     // ✅ URLs des services via Cloudflare Tunnels
     private const val AUTH_BASE_URL =
-        "https://guru-border-consist-network.trycloudflare.com" // Port 8082
+        "https://picture-twenty-adipex-hiv.trycloudflare.com" // Port 8082
     private const val DOCTOR_BASE_URL =
-        "https://cheaper-disclose-hospital-salvation.trycloudflare.com" // Port 8083
+        "https://teacher-recommendations-competitive-benefits.trycloudflare.com" // Port 8083
     private const val NOTIFICATION_BASE_URL =
         "https://normal-maintaining-antenna-his.trycloudflare.com" // Port 8084
     private const val USER_BASE_URL =
-        "https://substance-fda-innovation-enable.trycloudflare.com" // Port 8085
+        "https://models-outreach-types-sofa.trycloudflare.com" // Port 8085
 
 
     // Votre configuration existante...
-    private const val DOCTOR_SERVICE_BASE_URL = "http://10.0.2.2:8083/"
+    private const val DOCTOR_SERVICE_BASE_URL = "https://teacher-recommendations-competitive-benefits.trycloudflare.com"
 
     // ✅ AJOUTEZ CETTE FONCTION
     fun getWebRTCService(context: Context): WebRTCApiService {
@@ -103,7 +103,28 @@ object RetrofitClient {
         }
         return userApiService!!
     }
+    // Add to RetrofitClient.kt
+    fun getPatientWebRTCService(context: Context): WebRTCApiService {
+        val logging = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
 
+        val client = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+        // Use USER_BASE_URL for patient WebRTC calls
+        val retrofit = Retrofit.Builder()
+            .baseUrl(USER_BASE_URL) // Patient service URL
+            .client(client)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+        return retrofit.create(WebRTCApiService::class.java)
+    }
 
     // ✅ Default service (for backward compatibility)
     @Deprecated("Use getAuthService(), getDoctorService(), getUserService(), or getNotificationService() instead")

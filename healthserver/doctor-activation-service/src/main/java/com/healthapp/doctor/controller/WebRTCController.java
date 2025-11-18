@@ -1,30 +1,19 @@
 package com.healthapp.doctor.controller;
 
-import com.healthapp.doctor.dto.request.InitiateCallRequest;
-import com.healthapp.doctor.dto.request.AnswerCallRequest;
-import com.healthapp.doctor.dto.request.IceCandidateRequest;
 import com.healthapp.doctor.dto.response.CallSessionResponse;
 import com.healthapp.doctor.service.WebRTCService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 /**
- * WebRTC Controller - Gestion des appels vidéo/audio
- * 
- * Flow:
- * 1. Doctor/Patient clique "Appeler" -> POST /initiate
- * 2. Backend crée CallSession + retourne ICE servers
- * 3. Initiateur crée offer SDP -> POST /offer
- * 4. Destinataire reçoit notif -> GET /session/{id}
- * 5. Destinataire crée answer SDP -> POST /answer
- * 6. Les deux échangent ICE candidates -> POST /ice
- * 7. Connexion WebRTC établie (P2P ou via TURN)
- * 8. Fin d'appel -> POST /end
+ * WebRTC Controller - Handles video/audio call signaling
+ * ✅ NO @PreAuthorize - uses SecurityConfig rules instead
  */
 @RestController
 @RequestMapping("/api/webrtc")
@@ -35,137 +24,174 @@ public class WebRTCController {
     private final WebRTCService webRTCService;
 
     /**
-     * STEP 1: Initier un appel
-     * Appelé par le docteur ou le patient
+     * Initiate a call session
+     * ✅ Accessible to ANY authenticated user (DOCTOR or USER)
      */
     @PostMapping("/initiate")
     public ResponseEntity<CallSessionResponse> initiateCall(
-            @RequestBody InitiateCallRequest request,
-            Authentication auth) {
-
-        String initiatorEmail = auth.getName();
-        log.info("📞 {} initiating {} call for appointment {}",
-                initiatorEmail, request.getCallType(), request.getAppointmentId());
-
-        CallSessionResponse session = webRTCService.initiateCall(
-                request.getAppointmentId(),
+            @RequestBody InitiateCallRequest request) {
+        
+        // Get authenticated user from SecurityContext
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String userEmail = auth.getName();
+        
+        log.info("========================================");
+        log.info("📞 INITIATE CALL REQUEST");
+        log.info("========================================");
+        log.info("User Email: {}", userEmail);
+        log.info("User Authorities: {}", auth.getAuthorities());
+        log.info("Appointment ID: {}", request.getAppointmentId());
+        log.info("Call Type: {}", request.getCallType());
+        log.info("========================================");
+        
+        try {
+            CallSessionResponse response = webRTCService.initiateCall(
+                request.getAppointmentId(), 
                 request.getCallType(),
-                initiatorEmail
-        );
-
-        return ResponseEntity.ok(session);
+                userEmail
+            );
+            
+            log.info("✅ Call session created successfully");
+            log.info("   Call ID: {}", response.getCallId());
+            log.info("   ICE Servers: {}", response.getIceServers() != null ? "Provided" : "None");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            log.error("❌ ERROR creating call session", e);
+            log.error("   Error type: {}", e.getClass().getSimpleName());
+            log.error("   Error message: {}", e.getMessage());
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**
-     * STEP 2: Envoyer l'offre SDP (créée par l'initiateur)
+     * Send offer SDP
      */
-    @PostMapping("/{callId}/offer")
-    public ResponseEntity<Map<String, String>> sendOffer(
+    @PostMapping("/calls/{callId}/offer")
+    public ResponseEntity<Void> sendOffer(
             @PathVariable String callId,
-            @RequestBody Map<String, String> body,
-            Authentication auth) {
-
-        String sdp = body.get("sdp");
-        log.info("📤 Offer SDP received for call {}", callId);
-
-        webRTCService.saveOfferSdp(callId, sdp);
-
-        // TODO: Envoyer notification push au destinataire
-
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "message", "Offer SDP saved"
-        ));
+            @RequestBody Map<String, String> sdpData) {
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("📤 Send Offer - User: {}, Call: {}", auth.getName(), callId);
+        
+        try {
+            webRTCService.saveOfferSdp(callId, sdpData.get("sdp"));
+            log.info("✅ Offer SDP saved successfully");
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("❌ Error saving offer SDP", e);
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
-     * STEP 3: Récupérer les détails d'un appel (par le destinataire)
+     * Send answer SDP
      */
-    @GetMapping("/{callId}")
+    @PostMapping("/calls/{callId}/answer")
+    public ResponseEntity<Void> sendAnswer(
+            @PathVariable String callId,
+            @RequestBody Map<String, String> sdpData) {
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("📥 Send Answer - User: {}, Call: {}", auth.getName(), callId);
+        
+        try {
+            webRTCService.saveAnswerSdp(callId, sdpData.get("sdp"));
+            log.info("✅ Answer SDP saved successfully");
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("❌ Error saving answer SDP", e);
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Send ICE candidate
+     */
+    @PostMapping("/calls/{callId}/ice-candidate")
+    public ResponseEntity<Void> sendIceCandidate(
+            @PathVariable String callId,
+            @RequestBody Map<String, Object> candidateData) {
+        
+        log.debug("🧊 ICE candidate for call: {}", callId);
+        
+        try {
+            // TODO: Store ICE candidates in database if needed
+            log.debug("ICE candidate: {}", candidateData);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("❌ Error saving ICE candidate", e);
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Get call session details
+     */
+    @GetMapping("/calls/{callId}")
     public ResponseEntity<CallSessionResponse> getCallSession(
-            @PathVariable String callId,
-            Authentication auth) {
-
-        log.info("🔍 Fetching call session: {}", callId);
-
-        CallSessionResponse session = webRTCService.getCallSession(callId);
-
-        return ResponseEntity.ok(session);
+            @PathVariable String callId) {
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        log.info("📋 Get Call Session - User: {}, Call: {}", auth.getName(), callId);
+        
+        try {
+            CallSessionResponse response = webRTCService.getCallSession(callId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("❌ Error getting call session", e);
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
-     * STEP 4: Envoyer l'answer SDP (créée par le destinataire)
+     * End call
      */
-    @PostMapping("/{callId}/answer")
-    public ResponseEntity<Map<String, String>> sendAnswer(
+    @PostMapping("/calls/{callId}/end")
+    public ResponseEntity<Void> endCall(
             @PathVariable String callId,
-            @RequestBody AnswerCallRequest request,
-            Authentication auth) {
-
-        log.info("📥 Answer SDP received for call {}", callId);
-
-        webRTCService.saveAnswerSdp(callId, request.getSdp());
-        webRTCService.markCallAsActive(callId);
-
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "message", "Answer SDP saved, call is now active"
-        ));
+            @RequestBody Map<String, String> reasonData) {
+        
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String reason = reasonData.get("reason");
+        
+        log.info("🔵 End Call - User: {}, Call: {}, Reason: {}", 
+                 auth.getName(), callId, reason);
+        
+        try {
+            webRTCService.endCall(callId, reason);
+            log.info("✅ Call ended successfully");
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("❌ Error ending call", e);
+            return ResponseEntity.notFound().build();
+        }
     }
 
     /**
-     * STEP 5: Échanger ICE candidates
-     * Appelé par les deux parties pendant la négociation
+     * DTO for initiate call request
      */
-    @PostMapping("/{callId}/ice")
-    public ResponseEntity<Map<String, String>> addIceCandidate(
-            @PathVariable String callId,
-            @RequestBody IceCandidateRequest request,
-            Authentication auth) {
+    public static class InitiateCallRequest {
+        private String appointmentId;
+        private String callType;
 
-        log.debug("🧊 ICE candidate received for call {}", callId);
-
-        // En production, utilisez WebSocket pour relay ICE en temps réel
-        // Ici on logge juste pour l'audit
-
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "message", "ICE candidate received"
-        ));
-    }
-
-    /**
-     * STEP 6: Terminer l'appel
-     */
-    @PostMapping("/{callId}/end")
-    public ResponseEntity<Map<String, String>> endCall(
-            @PathVariable String callId,
-            @RequestBody Map<String, String> body,
-            Authentication auth) {
-
-        String reason = body.getOrDefault("reason", "COMPLETED");
-        log.info("📵 Ending call {}: {}", callId, reason);
-
-        webRTCService.endCall(callId, reason);
-
-        return ResponseEntity.ok(Map.of(
-                "status", "success",
-                "message", "Call ended"
-        ));
-    }
-
-    /**
-     * Récupérer la qualité de l'appel (QoS)
-     */
-    @GetMapping("/{callId}/qos")
-    public ResponseEntity<Map<String, Object>> getCallQuality(
-            @PathVariable String callId,
-            Authentication auth) {
-
-        log.info("📊 Fetching QoS for call {}", callId);
-
-        Map<String, Object> qos = webRTCService.getCallQuality(callId);
-
-        return ResponseEntity.ok(qos);
+        // Getters and Setters
+        public String getAppointmentId() { 
+            return appointmentId; 
+        }
+        
+        public void setAppointmentId(String appointmentId) { 
+            this.appointmentId = appointmentId; 
+        }
+        
+        public String getCallType() { 
+            return callType; 
+        }
+        
+        public void setCallType(String callType) { 
+            this.callType = callType; 
+        }
     }
 }
